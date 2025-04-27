@@ -1,85 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import BlackjackCard, { Suit, Rank } from './BlackjackCard';
-import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-
-type Card = {
-  suit: Suit;
-  rank: Rank;
-  value: number;
-};
-
-const suits: Suit[] = ['♥', '♦', '♣', '♠'];
-const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const values: Record<Rank, number[]> = {
-  'A': [1, 11], '2': [2], '3': [3], '4': [4], '5': [5], '6': [6], '7': [7], '8': [8], '9': [9], '10': [10], 'J': [10], 'Q': [10], 'K': [10]
-};
+import { Card, GameState } from '@/types/blackjack';
+import { initializeDeck, calculateHandValue } from '@/utils/blackjackUtils';
+import GameStatus from './blackjack/GameStatus';
+import BettingControls from './blackjack/BettingControls';
+import PlayerHand from './blackjack/PlayerHand';
+import DealerHand from './blackjack/DealerHand';
+import GameControls from './blackjack/GameControls';
 
 const BlackjackGame: React.FC = () => {
   const [deck, setDeck] = useState<Card[]>([]);
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
-  const [gameState, setGameState] = useState<'betting' | 'playing' | 'dealerTurn' | 'gameOver'>('betting');
+  const [gameState, setGameState] = useState<GameState>('betting');
   const [playerBalance, setPlayerBalance] = useState(1000);
   const [currentBet, setCurrentBet] = useState(0);
   const [message, setMessage] = useState('Добро пожаловать в Блэк Джек! Сделайте ставку');
   const [dealerCardHidden, setDealerCardHidden] = useState(true);
 
-  // Инициализация и перемешивание колоды
-  const initializeDeck = () => {
-    const newDeck: Card[] = [];
-    
-    for (const suit of suits) {
-      for (const rank of ranks) {
-        newDeck.push({
-          suit,
-          rank,
-          value: values[rank][0]
-        });
-      }
-    }
-    
-    // Перемешивание колоды (алгоритм Фишера-Йейтса)
-    for (let i = newDeck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
-    }
-    
-    return newDeck;
-  };
-
   // Взять карту из колоды
   const drawCard = () => {
     if (deck.length === 0) {
-      setDeck(initializeDeck());
-      return deck[0];
+      const newDeck = initializeDeck();
+      setDeck(newDeck.slice(1));
+      return newDeck[0];
     }
     const card = deck[0];
     setDeck(deck.slice(1));
     return card;
-  };
-
-  // Подсчет очков руки (с учетом тузов)
-  const calculateHandValue = (hand: Card[]) => {
-    let value = 0;
-    let aces = 0;
-
-    for (const card of hand) {
-      if (card.rank === 'A') {
-        aces += 1;
-        value += 11;
-      } else {
-        value += card.value;
-      }
-    }
-
-    // Если сумма больше 21 и есть тузы, считаем тузы за 1
-    while (value > 21 && aces > 0) {
-      value -= 10;
-      aces -= 1;
-    }
-
-    return value;
   };
 
   // Начало новой игры
@@ -228,127 +176,33 @@ const BlackjackGame: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center justify-center p-6 w-full min-h-screen">
-      <div className="text-center mb-4">
-        <h1 className="text-4xl font-casino font-bold text-casino-gold mb-2">Блэкджек</h1>
-        <p className="text-lg text-white mb-4">{message}</p>
-        
-        <div className="flex justify-center items-center gap-4 mb-4">
-          <div className="text-white bg-casino-dark p-3 rounded-md">
-            <p className="text-sm">Баланс</p>
-            <p className="text-2xl font-bold text-casino-gold">${playerBalance}</p>
-          </div>
-          
-          {gameState === 'betting' && (
-            <div className="text-white bg-casino-dark p-3 rounded-md">
-              <p className="text-sm">Ставка</p>
-              <p className="text-2xl font-bold text-casino-gold">${currentBet}</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <GameStatus 
+        message={message}
+        playerBalance={playerBalance}
+        currentBet={currentBet}
+        showBet={gameState === 'betting'}
+      />
       
       {gameState === 'betting' ? (
-        <div className="mb-8">
-          <div className="flex gap-2 mb-4">
-            <Button 
-              variant="outline" 
-              onClick={() => handleBetChange(10)}
-              className="bg-casino-dark text-white hover:bg-casino-green"
-            >
-              +10
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => handleBetChange(25)}
-              className="bg-casino-dark text-white hover:bg-casino-green"
-            >
-              +25
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => handleBetChange(100)}
-              className="bg-casino-dark text-white hover:bg-casino-green"
-            >
-              +100
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => handleBetChange(-10)}
-              className="bg-casino-dark text-white hover:bg-casino-red"
-            >
-              -10
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setCurrentBet(0)}
-              className="bg-casino-dark text-white hover:bg-casino-red"
-            >
-              Сброс
-            </Button>
-          </div>
-          
-          <Button 
-            onClick={startGame} 
-            className="w-full bg-casino-green hover:bg-casino-green/80"
-            disabled={currentBet <= 0 || currentBet > playerBalance}
-          >
-            Начать игру
-          </Button>
-        </div>
+        <BettingControls 
+          onBetChange={handleBetChange}
+          onStartGame={startGame}
+          currentBet={currentBet}
+          playerBalance={playerBalance}
+        />
       ) : (
         <>
           <div className="mb-6 w-full max-w-2xl">
-            <div className="bg-casino-dark bg-opacity-60 rounded-lg p-4 mb-4">
-              <h2 className="text-lg font-semibold mb-2 text-white">Дилер {!dealerCardHidden && `(${calculateHandValue(dealerHand)})`}</h2>
-              <div className="flex gap-2 overflow-x-auto p-2">
-                {dealerHand.map((card, index) => (
-                  <div key={`dealer-${index}`} className="flex-shrink-0 transform transition-all" style={{
-                    transform: `translateX(${-index * 20}px)`,
-                    zIndex: dealerHand.length - index
-                  }}>
-                    <BlackjackCard 
-                      suit={card.suit} 
-                      rank={card.rank} 
-                      hidden={index === 1 && dealerCardHidden} 
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <div className="bg-casino-dark bg-opacity-60 rounded-lg p-4">
-              <h2 className="text-lg font-semibold mb-2 text-white">Игрок ({calculateHandValue(playerHand)})</h2>
-              <div className="flex gap-2 overflow-x-auto p-2">
-                {playerHand.map((card, index) => (
-                  <div key={`player-${index}`} className="flex-shrink-0 transform transition-all" style={{
-                    transform: `translateX(${-index * 20}px)`,
-                    zIndex: playerHand.length - index
-                  }}>
-                    <BlackjackCard suit={card.suit} rank={card.rank} />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <DealerHand cards={dealerHand} hidden={dealerCardHidden} />
+            <PlayerHand cards={playerHand} />
           </div>
           
-          <div className="flex gap-4">
-            {gameState === 'playing' && (
-              <>
-                <Button onClick={handleHit} className="bg-casino-green hover:bg-casino-green/80">
-                  Еще карту
-                </Button>
-                <Button onClick={handleStand} className="bg-casino-red hover:bg-casino-red/80">
-                  Хватит
-                </Button>
-              </>
-            )}
-            
-            {gameState === 'gameOver' && (
-              <Button onClick={handleNewGame} className="bg-casino-gold text-black hover:bg-casino-gold/80">
-                Новая игра
-              </Button>
-            )}
-          </div>
+          <GameControls 
+            gameState={gameState}
+            onHit={handleHit}
+            onStand={handleStand}
+            onNewGame={handleNewGame}
+          />
         </>
       )}
       
